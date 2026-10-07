@@ -63,10 +63,11 @@ function errMessage(health, id) {
 /* ---------- Telemetry: satu baris = satu agent (service + number) ---------- */
 export function fetchTelemetry(config, tick = 1) {
   const rows = [];
-  for (const svc of config.services) {
-    for (const num of svc.numbers) {
-      const id = svc.id + "|" + num;
-      const health = healthProfile(id, svc.numbers.indexOf(num));
+  for (const svc of config.accounts) {
+    for (const [index, phone] of svc.numbers.entries()) {
+      const num = phone.number;
+      const id = svc.id + "|" + phone.id;
+      const health = healthProfile(id, index);
 
       const base = (hashStr(id) % 18000) + 400;
       const jitter =
@@ -109,11 +110,14 @@ export function fetchTelemetry(config, tick = 1) {
         id,
         service: svc.name,
         serviceId: svc.id,
-        tenantId: svc.tenantId,
-        tenantPath: tenantPath(config.tenants, svc.tenantId),
+        tenantId: svc.businessUnitId,
+        tenantPath: tenantPath(config.businessUnits, svc.businessUnitId),
         serviceLabel: serviceLabel(config, svc),
         number: num,
-        workstationIndex: svc.numbers.indexOf(num) + 1,
+        phoneId: phone.id,
+        displayName: phone.displayName,
+        wabaId: svc.wabaId,
+        workstationIndex: index + 1,
         role: "Inbound + Outbound",
         health,
         status,

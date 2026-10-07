@@ -1,138 +1,179 @@
-import { tenantPath, tenantScopeIds } from "../lib/config.js";
+import { useState } from "react";
+import { accountLabel } from "../lib/config.js";
 import { inputClass } from "./ui.jsx";
-
-export function TenantTree({ config, selected, onSelect }) {
-  const roots = config.tenants.filter((tenant) => !tenant.parentId);
-  function count(id) {
-    const scope = tenantScopeIds(config.tenants, id);
-    return config.services
-      .filter((service) => scope.has(service.tenantId))
-      .reduce((sum, service) => sum + service.numbers.length, 0);
-  }
-  const selectedTenant = config.tenants.find(
-    (tenant) => tenant.id === selected,
+const rowClass =
+  "flex min-h-10 min-w-0 flex-1 items-center justify-between gap-1 rounded-lg px-2 py-2 text-left text-[11px] hover:bg-stone-100";
+export function TenantTree({ config, selected, account, phone, onSelect }) {
+  const [closed, setClosed] = useState(new Set());
+  const toggle = (id) =>
+    setClosed((old) => {
+      const next = new Set(old);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  const count = (accounts) =>
+    accounts.reduce((n, a) => n + a.numbers.length, 0);
+  const disclosure = (id, label) => (
+    <button
+      aria-label={`${closed.has(id) ? "Expand" : "Collapse"} ${label}`}
+      aria-expanded={!closed.has(id)}
+      onClick={() => toggle(id)}
+      className="min-h-10 w-6 shrink-0 text-stone-400"
+    >
+      {closed.has(id) ? "›" : "⌄"}
+    </button>
   );
   return (
-    <div className="mt-7 hidden md:block">
-      <div className="mb-3 flex items-center justify-between px-3 text-[9px] tracking-widest text-stone-400">
-        <span>TENANTS</span>
-        <span>{roots.length}</span>
-      </div>
-      <nav aria-label="Tenant hierarchy" className="space-y-1">
-        <button
-          onClick={() => onSelect("")}
-          aria-pressed={!selected}
-          className={`flex min-h-10 w-full items-center justify-between rounded-lg px-3 text-xs ${!selected ? "bg-[#e8eee2] text-emerald-800" : "text-stone-500 hover:bg-stone-100"}`}
-        >
-          <span>Semua tenant</span>
-          <span className="font-mono text-[10px]">{count("")}</span>
-        </button>
-        {roots.map((tenant) => {
-          const children = config.tenants.filter(
-            (child) => child.parentId === tenant.id,
+    <nav aria-label="Business Unit hierarchy" className="mt-7 hidden md:block">
+      <p className="px-2 pb-3 text-[9px] tracking-widest text-stone-400">
+        BUSINESS UNITS
+      </p>
+      <button
+        className={`${rowClass} w-full ${!selected ? "bg-emerald-50" : ""}`}
+        aria-pressed={!selected}
+        onClick={() => onSelect("")}
+      >
+        Semua Business Unit <span>{count(config.accounts)}</span>
+      </button>
+      <ul>
+        {config.businessUnits.map((unit) => {
+          const accounts = config.accounts.filter(
+            (a) => a.businessUnitId === unit.id,
           );
-          const inScope =
-            selected === tenant.id || selectedTenant?.parentId === tenant.id;
           return (
-            <div key={tenant.id}>
-              <button
-                onClick={() => onSelect(tenant.id)}
-                aria-pressed={selected === tenant.id}
-                className={`flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-xs ${inScope ? "bg-[#edf1e7] font-medium text-emerald-800" : "text-stone-500 hover:bg-stone-100"}`}
-              >
-                <span className="text-stone-400">
-                  {children.length ? "⌄" : "·"}
-                </span>
-                <span className="truncate">{tenant.name}</span>
-                <span className="ml-auto font-mono text-[10px] text-stone-400">
-                  {count(tenant.id)}
-                </span>
-              </button>
-              {children.length > 0 && (
-                <div className="ml-4 border-l border-stone-200 pl-2">
-                  {children.map((child) => (
-                    <button
-                      key={child.id}
-                      aria-label={`Tenant ${tenant.name} / ${child.name}`}
-                      aria-pressed={selected === child.id}
-                      onClick={() => onSelect(child.id)}
-                      className={`flex min-h-9 w-full items-center justify-between gap-2 rounded-md px-2 text-[11px] ${selected === child.id ? "bg-emerald-50 font-medium text-emerald-800" : "text-stone-500 hover:bg-stone-100"}`}
-                    >
-                      <span className="truncate">{child.name}</span>
-                      <span className="font-mono text-[10px] text-stone-400">
-                        {count(child.id)}
-                      </span>
-                    </button>
+            <li key={unit.id}>
+              <div className="flex">
+                {accounts.length ? (
+                  disclosure(unit.id, unit.name)
+                ) : (
+                  <span className="w-6" />
+                )}
+                <button
+                  className={`${rowClass} ${selected === unit.id && !account ? "bg-[#e8eee2] text-emerald-800" : ""}`}
+                  aria-pressed={selected === unit.id && !account}
+                  onClick={() => onSelect(unit.id)}
+                >
+                  <span className="break-words">{unit.name}</span>
+                  <span className="text-stone-400">{count(accounts)}</span>
+                </button>
+              </div>
+              {!closed.has(unit.id) && (
+                <ul className="ml-3 border-l border-stone-200 pl-1">
+                  {accounts.map((a) => (
+                    <li key={a.id}>
+                      <div className="flex">
+                        {disclosure(a.id, accountLabel(a))}
+                        <button
+                          className={`${rowClass} ${account === a.id && !phone ? "bg-[#e8eee2] text-emerald-800" : ""}`}
+                          aria-pressed={account === a.id && !phone}
+                          onClick={() => onSelect(unit.id, a.id)}
+                        >
+                          <span className="min-w-0 break-words">
+                            {a.name}
+                            <small className="block text-[9px] text-stone-400">
+                              WABA {a.wabaId || "ID belum diisi"}
+                            </small>
+                          </span>
+                          <span>{a.numbers.length}</span>
+                        </button>
+                      </div>
+                      {!closed.has(a.id) && (
+                        <ul className="ml-3 border-l border-stone-200 pl-1">
+                          {a.numbers.map((n) => (
+                            <li key={n.id}>
+                              <button
+                                className={`${rowClass} w-full ${account === a.id && phone === n.id ? "bg-emerald-100 text-emerald-800" : ""}`}
+                                aria-pressed={
+                                  account === a.id && phone === n.id
+                                }
+                                onClick={() => onSelect(unit.id, a.id, n.id)}
+                              >
+                                <span className="min-w-0 break-words">
+                                  <span className="font-mono">{n.number}</span>
+                                  <small className="block text-[10px] text-stone-500">
+                                    {n.displayName || "Nama belum diisi"}
+                                  </small>
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
-            </div>
+            </li>
           );
         })}
-      </nav>
-      <p className="mt-3 px-3 text-[9px] leading-relaxed text-stone-400">
-        Angka menunjukkan jumlah nomor WABA, termasuk subtenant.
+      </ul>
+      <p className="mt-3 px-2 text-[9px] leading-relaxed text-stone-400">
+        Business Unit → WABA Account → WA number. Angka menunjukkan jumlah
+        nomor.
       </p>
-    </div>
+    </nav>
   );
 }
-
-export function TenantFilters({ config, selected, onSelect }) {
-  const tenant = config.tenants.find((item) => item.id === selected);
-  const rootId = tenant?.parentId || tenant?.id || "";
-  const children = config.tenants.filter((item) => item.parentId === rootId);
+export function TenantFilters({ config, selected, account, phone, onSelect }) {
+  const accounts = config.accounts.filter(
+    (a) => !selected || a.businessUnitId === selected,
+  );
+  const current = config.accounts.find((a) => a.id === account);
   return (
     <section
-      aria-label="Scope tenant"
-      className="mb-5 flex flex-wrap items-end justify-between gap-3 rounded-xl border border-stone-200 bg-[#fdfefb] p-3 sm:p-4"
+      aria-label="Workspace scope"
+      className="mb-5 rounded-xl border border-stone-200 bg-[#fdfefb] p-3 sm:p-4"
     >
-      <div className="min-w-0">
-        <p className="text-[9px] tracking-widest text-stone-400">
-          TENANT WORKSPACE
-        </p>
-        <h2 className="mt-1 break-words text-sm font-semibold">
-          {selected ? tenantPath(config.tenants, selected) : "Semua tenant"}
-        </h2>
-        <p className="mt-1 text-[10px] text-stone-400">
-          {children.length && selected === rootId
-            ? "Ringkasan seluruh subtenant dalam tenant ini."
-            : "Office, metrik, dan aktivitas mengikuti pilihan tenant."}
-        </p>
-      </div>
-      <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-72">
-        <label className="min-w-0 text-[10px] text-stone-500">
-          Tenant
+      <p className="mb-3 text-[10px] text-stone-500">
+        Satu blok = WABA Account · Satu orang = WA number
+      </p>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <label className="min-w-0 text-xs">
+          Business Unit
           <select
-            aria-label="Tenant utama"
             className={`${inputClass} mt-1`}
-            value={rootId}
-            onChange={(event) => onSelect(event.target.value)}
+            value={selected}
+            onChange={(e) => onSelect(e.target.value)}
           >
-            <option value="">Semua tenant</option>
-            {config.tenants
-              .filter((item) => !item.parentId)
-              .map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
+            <option value="">Semua Business Unit</option>
+            {config.businessUnits.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
           </select>
         </label>
-        <label className="min-w-0 text-[10px] text-stone-500">
-          Subtenant
+        <label className="min-w-0 text-xs">
+          WABA Account
           <select
-            aria-label="Subtenant"
-            disabled={!children.length}
-            className={`${inputClass} mt-1 disabled:bg-stone-100 disabled:text-stone-400`}
-            value={tenant?.parentId ? tenant.id : ""}
-            onChange={(event) => onSelect(event.target.value || rootId)}
+            className={`${inputClass} mt-1`}
+            value={account}
+            onChange={(e) => {
+              const a = config.accounts.find((a) => a.id === e.target.value);
+              onSelect(a?.businessUnitId || selected, a?.id || "");
+            }}
           >
-            <option value="">
-              {children.length ? "Semua subtenant" : "Tidak ada subtenant"}
-            </option>
-            {children.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
+            <option value="">Semua WABA Account</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {accountLabel(a)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="min-w-0 text-xs">
+          WA number
+          <select
+            className={`${inputClass} mt-1 disabled:opacity-50`}
+            disabled={!current}
+            value={phone}
+            onChange={(e) => onSelect(selected, account, e.target.value)}
+          >
+            <option value="">Semua nomor</option>
+            {current?.numbers.map((n) => (
+              <option key={n.id} value={n.id}>
+                {n.number}
+                {n.displayName ? ` (${n.displayName})` : ""}
               </option>
             ))}
           </select>

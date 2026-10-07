@@ -2,7 +2,7 @@
 
 Dashboard monitoring WABA berbasis **React 19.3.0**, **Vite 8.3.3**, dan **Tailwind CSS 4.3.3**. Versi stabil terbaru dari registry saat migrasi dipin di `package.json` dan `package-lock.json`.
 
-Semua data saat ini adalah **simulasi**, belum terhubung ke backend atau Meta API. Tenant adalah scope tampilan lokal, bukan mekanisme otorisasi backend.
+Semua data saat ini adalah **simulasi**, belum terhubung ke backend atau Meta API. Business Unit adalah scope tampilan lokal, bukan mekanisme otorisasi backend.
 
 ## Menjalankan
 
@@ -23,40 +23,32 @@ npm test
 
 Output produksi berada di `dist/`. Pada hosting seperti Vercel, pilih preset **Vite**, build command `npm run build`, dan output directory `dist`. Server statis Python sebelumnya tidak lagi menjalankan source aplikasi; source sekarang memerlukan Vite.
 
-## Tenant dan subtenant
+## Business Unit, WABA Account, WA number
 
 ```text
-ISO
-UDSO
-LSO
-HSO
-HO
-AWO
-├── TSO
-├── DSO
-├── ACC
-├── FIF
-└── Bank Saqu
+TSO (Business Unit)
+└── TSO · 11234 (WABA Account name · ID)
+    ├── 0812xx (Tasya)
+    └── 0813xx (TSO - Cilandak)
 ```
 
-- Pilih tenant di sidebar, atau dropdown **Tenant utama** dan **Subtenant** pada desktop maupun ponsel.
-- Memilih **AWO** menggabungkan nomor milik AWO dan seluruh subtenant; memilih **AWO / TSO** membatasi tampilan ke TSO.
-- Filter service, pencarian, status, KPI, kantor, daftar aktivitas, dan tabel menggunakan scope yang sama. Berpindah tenant mereset filter turunan agar data tidak tersembunyi oleh pilihan lama.
-- Service lama TSO/DSO dipetakan ke AWO. Tenant lain tersedia tetapi kosong sampai Anda menambahkan nomor; tidak dibuat nomor demo tambahan.
-- Buka **Tenant & Nomor** untuk menambah tenant/subtenant, mengatur induk, atau menempatkan service dan nomor pada tenant yang benar. Tenant yang masih memiliki anak atau service tidak dapat dihapus sebelum isinya dipindahkan/dihapus.
-- Model mendukung dua tingkat tenant, dengan ID stabil untuk tenant dan service. Service dan nomor dengan nama yang sama di tenant berbeda tetap memiliki identitas terpisah.
-- Konfigurasi baru disimpan pada `waba-monitor-config-v3`. Konfigurasi `waba-monitor-config-v2` terbaca dan dimigrasikan tanpa menimpa key lama. Service lama yang tidak dapat dipetakan ditempatkan di **Belum dipetakan**, agar nomor tetap tersedia.
-- Penyimpanan mengikuti origin browser. Jika sebelumnya memakai port 8899, localStorage port tersebut tidak otomatis tersedia di port 5173. Jalankan Vite di origin lama (`npm run dev -- --port 8899`, setelah server lama dihentikan) untuk membaca konfigurasi lamanya.
+- Satu Business Unit dapat memiliki banyak WABA Account; satu akun dapat memiliki banyak nomor dengan display name masing-masing.
+- Setiap blok kantor adalah satu akun (dikelompokkan berdasarkan ID internal yang stabil); setiap orang adalah satu nomor.
+- Sidebar menyediakan tiga tingkat dengan expand/collapse dan pemilihan scope. Dropdown menyediakan scope yang sama pada ponsel.
+- **Business Unit & WABA** mengatur unit, nama/ID akun, nomor dan display name. **Gunakan contoh TSO** mengisi draft contoh; perubahan baru disimpan setelah memilih Simpan perubahan.
+- Konfigurasi v4 memakai `businessUnits` dan `accounts`; setiap nomor memiliki `id`, `number`, dan `displayName`. Data v2/v3 dimigrasikan tanpa mengganti nomor atau mengarang WABA ID. Tenant lama menjadi Business Unit dan service lama menjadi akun. Key lama tidak ditimpa.
+- Penyimpanan lokal mengikuti origin browser; data pada port lain tidak otomatis terbaca. Semua metrik tetap simulasi.
+- Popup status hanya ditempatkan di ruang kosong yang tidak bertabrakan dengan orang, label nomor, atau popup lain. Bila tidak tersedia ruang aman, popup disembunyikan; detail tetap dapat dibuka melalui orang atau panel aktivitas.
 
 ## Tampilan dan kontrol
 
-- **The office:** kantor isometrik dengan satu operator per nomor, zona service, lounge, meja, tanaman, dan bubble status. Klik operator untuk sesi simulasi; operator juga dapat dipilih melalui keyboard.
+- **The office:** kantor isometrik dengan satu operator per nomor, blok WABA Account, lounge, meja, tanaman, dan bubble status. Klik operator untuk sesi simulasi; operator juga dapat dipilih melalui keyboard.
 - **Workstations:** kartu per nomor dengan miniatur kantor dan metrik.
 - **Agent View:** contoh percakapan inbound/outbound dan status tiap nomor.
 - **Traffic Flow:** alur customer → webhook → agent → Meta API; klik baris untuk detail sesi.
 - **Live:** refresh setiap 15 detik; pause menghentikan refresh otomatis dan animasi. Refresh manual tetap tersedia saat pause. Tab tersembunyi tidak memperbarui telemetry.
 - Zoom **− / +**, **Fit view**, **Bubble on/off**, dan mode fokus kantor. Escape menutup dialog terlebih dahulu; Escape berikutnya keluar dari mode fokus.
-- Layout responsif: navigasi ringkas dan dropdown tenant pada ponsel, sidebar pada tablet/desktop, office dan aktivitas bertumpuk pada layar kecil, tabel/alur lebar scroll di dalam panel. Dialog dibatasi tinggi viewport.
+- Layout responsif: navigasi ringkas dan dropdown scope pada ponsel, sidebar pada tablet/desktop, office dan aktivitas bertumpuk pada layar kecil, tabel/alur lebar scroll di dalam panel. Dialog dibatasi tinggi viewport.
 - Canvas dikelola melalui React effects dan dibersihkan saat unmount; animation frame, observer, dan listener tidak ditinggalkan. `prefers-reduced-motion` dihormati.
 
 ## Aturan status
@@ -78,10 +70,10 @@ src/
     Office.jsx            Wrapper canvas dan panel aktivitas
     Tenants.jsx           Hierarki sidebar dan pemilih scope
     Views.jsx             Workstations, Agent View, Flow, tabel
-    Dialogs.jsx           Detail sesi dan pengaturan tenant/service
+    Dialogs.jsx           Detail sesi dan pengaturan Business Unit/WABA
     ui.jsx                Tombol, input, badge, ikon Tailwind
   lib/
-    config.js             Skema tenant, validasi, migrasi, localStorage
+    config.js             Skema Business Unit/WABA, validasi, migrasi, localStorage
     telemetry.js          Generator data dan sesi simulasi
     state.js              Resolver status dan konten bubble murni
     office-scene.js        Renderer Canvas 2D dengan lifecycle dispose

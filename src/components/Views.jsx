@@ -28,6 +28,11 @@ export function Workstations({ rows, paused, bubbles, onSelect }) {
                       </p>
                       <h3 className="mt-1 font-mono text-sm font-semibold">
                         {row.number}
+                        {row.displayName && (
+                          <span className="ml-1 font-sans text-[10px] font-normal">
+                            ({row.displayName})
+                          </span>
+                        )}
                       </h3>
                     </div>
                     <Badge row={row} />
@@ -49,7 +54,13 @@ export function Workstations({ rows, paused, bubbles, onSelect }) {
                     onClick={() => onSelect(row)}
                     className={`${buttonClass} m-3 mt-0 w-[calc(100%-24px)]`}
                   >
-                    Detail {row.serviceLabel} · {row.number} ↗
+                    Detail {row.serviceLabel} · {row.number}
+                    {row.displayName && (
+                      <span className="ml-1 font-sans text-[10px] font-normal">
+                        ({row.displayName})
+                      </span>
+                    )}{" "}
+                    ↗
                   </button>
                 </article>
               ))}
@@ -81,7 +92,14 @@ export function Agents({ rows, bubbles, onSelect }) {
         >
           <header className="flex items-center justify-between gap-2 p-4">
             <div>
-              <h2 className="font-mono text-sm font-semibold">{row.number}</h2>
+              <h2 className="font-mono text-sm font-semibold">
+                {row.number}
+                {row.displayName && (
+                  <span className="ml-1 font-sans text-[10px] font-normal">
+                    ({row.displayName})
+                  </span>
+                )}
+              </h2>
               <p className="mt-1 text-[10px] text-stone-400">
                 {row.serviceLabel} · Inbound + Outbound
               </p>
@@ -112,7 +130,13 @@ export function Agents({ rows, bubbles, onSelect }) {
               {fmt(row.total)} pesan · {row.latency}s
             </span>
             <button className={buttonClass} onClick={() => onSelect(row)}>
-              Detail {row.number} ↗
+              Detail {row.number}
+              {row.displayName && (
+                <span className="ml-1 font-sans text-[10px] font-normal">
+                  ({row.displayName})
+                </span>
+              )}{" "}
+              ↗
             </button>
           </footer>
         </article>
@@ -152,7 +176,7 @@ export function Flow({ rows, paused, onSelect }) {
                   <button
                     key={row.id}
                     onClick={() => onSelect(row)}
-                    aria-label={`Alur ${row.serviceLabel} ${row.number}`}
+                    aria-label={`Alur ${row.serviceLabel} ${row.number} ${row.displayName || ""}`}
                     className="relative mb-3 grid w-full grid-cols-4 items-center gap-4 rounded-lg p-2 hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-emerald-600"
                   >
                     <div className="pointer-events-none absolute inset-x-14 top-1/2 h-px bg-emerald-200" />
@@ -198,8 +222,8 @@ export function MetricsTable({ rows, onSelect }) {
               {[
                 "Workstation",
                 "Nomor WABA",
-                "Tenant",
-                "Service",
+                "Business Unit",
+                "WABA Account",
                 "Status",
                 "Total pesan",
                 "Success rate",
@@ -227,17 +251,22 @@ export function MetricsTable({ rows, onSelect }) {
                 <td className="px-4 py-2">
                   <button
                     onClick={() => onSelect(row)}
-                    aria-label={`Detail nomor ${row.number} service ${row.serviceLabel}`}
+                    aria-label={`Detail nomor ${row.number} ${row.displayName || ""} service ${row.serviceLabel}`}
                     className="min-h-10 font-mono font-medium text-emerald-700 underline decoration-emerald-200 underline-offset-4"
                   >
                     {row.number}
+                    {row.displayName && (
+                      <span className="ml-1 font-sans text-[10px] font-normal">
+                        ({row.displayName})
+                      </span>
+                    )}
                   </button>
                 </td>
                 <td className="whitespace-nowrap px-4 py-2 text-stone-500">
                   {row.tenantPath}
                 </td>
                 <td className="whitespace-nowrap px-4 py-2 text-stone-500">
-                  {row.service}
+                  {row.serviceLabel}
                 </td>
                 <td className="px-4 py-2">
                   <Badge row={row} />

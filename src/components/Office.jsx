@@ -186,7 +186,7 @@ function Activity({ rows, paused, onSelect, focused }) {
         {(expanded ? ordered : ordered.slice(0, 6)).map((row) => (
           <button
             key={row.id}
-            aria-label={`Detail ${row.serviceLabel} ${row.number}`}
+            aria-label={`Detail ${row.serviceLabel} ${row.number} ${row.displayName || ""}`}
             onClick={() => onSelect(row)}
             className="flex w-full gap-3 border-b border-stone-100 py-3 text-left last:border-0 hover:bg-emerald-50/50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-emerald-600"
           >
@@ -195,7 +195,14 @@ function Activity({ rows, paused, onSelect, focused }) {
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex flex-wrap items-center justify-between gap-1">
-                <strong className="font-mono text-xs">{row.number}</strong>
+                <strong className="font-mono text-xs">
+                  {row.number}
+                  {row.displayName && (
+                    <span className="ml-1 font-sans text-[10px] font-normal">
+                      ({row.displayName})
+                    </span>
+                  )}
+                </strong>
                 <Badge row={row} />
               </span>
               <span className="mt-1 block truncate text-[10px] text-stone-400">

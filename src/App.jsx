@@ -38,6 +38,7 @@ export default function App() {
   const [updated, setUpdated] = useState(() => new Date());
   const [view, setView] = useState("office");
   const [tenant, setTenant] = useState("");
+  const [phone, setPhone] = useState("");
   const [service, setService] = useState("");
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
@@ -49,12 +50,12 @@ export default function App() {
   const [settings, setSettings] = useState(false);
   const rows = useMemo(() => fetchTelemetry(config, tick), [config, tick]);
   const scope = useMemo(
-    () => tenantScopeIds(config.tenants, tenant),
-    [config.tenants, tenant],
+    () => tenantScopeIds(config.businessUnits, tenant),
+    [config.businessUnits, tenant],
   );
   const scopedServices = useMemo(
-    () => config.services.filter((item) => scope.has(item.tenantId)),
-    [config.services, scope],
+    () => config.accounts.filter((item) => scope.has(item.businessUnitId)),
+    [config.accounts, scope],
   );
   const filtered = useMemo(
     () =>
@@ -62,13 +63,14 @@ export default function App() {
         (row) =>
           scope.has(row.tenantId) &&
           (!service || row.serviceId === service) &&
+          (!phone || row.phoneId === phone) &&
           (!status || WorkstationState.resolve(row) === status) &&
           (!search.trim() ||
-            `${row.number} ${row.service} ${row.tenantPath}`
+            `${row.number} ${row.displayName} ${row.wabaId} ${row.service} ${row.tenantPath}`
               .toLocaleLowerCase()
               .includes(search.trim().toLocaleLowerCase())),
       ),
-    [rows, scope, service, status, search],
+    [rows, scope, service, phone, status, search],
   );
   const refresh = useCallback(() => {
     setTick((previous) => previous + 1);
@@ -109,18 +111,21 @@ export default function App() {
     saveConfig(next);
     setConfig(next);
     setService("");
-    if (!next.tenants.some((item) => item.id === tenant)) setTenant("");
+    setPhone("");
+    if (!next.businessUnits.some((item) => item.id === tenant)) setTenant("");
     setSettings(false);
     refresh();
   }
-  function selectTenant(id) {
+  function selectTenant(id, accountId = "", phoneId = "") {
     setTenant(id);
-    setService("");
+    setService(accountId);
+    setPhone(phoneId);
     setStatus("");
     setSearch("");
   }
   function resetFilters() {
     setService("");
+    setPhone("");
     setStatus("");
     setSearch("");
   }
@@ -150,7 +155,7 @@ export default function App() {
             </span>
           </a>
           <button
-            aria-label="Tenant & Nomor mobile"
+            aria-label="Business Unit & WABA mobile"
             className={`${buttonClass} px-2 md:hidden`}
             onClick={() => setSettings(true)}
           >
@@ -176,14 +181,20 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <TenantTree config={config} selected={tenant} onSelect={selectTenant} />
+        <TenantTree
+          config={config}
+          selected={tenant}
+          account={service}
+          phone={phone}
+          onSelect={selectTenant}
+        />
         <div className="mt-auto hidden pt-8 md:block">
           <button
             className="flex min-h-11 w-full items-center gap-2 border-t border-stone-200 px-3 py-4 text-xs text-stone-500"
             onClick={() => setSettings(true)}
           >
             <Icon name="settings" />
-            Tenant & Nomor
+            Business Unit & WABA
           </button>
           <div className="mt-5 rounded-xl bg-[#f0f3ec] p-3">
             <p className="flex items-center gap-2 text-[11px] text-[#63725d]">
@@ -264,6 +275,8 @@ export default function App() {
             <TenantFilters
               config={config}
               selected={tenant}
+              account={service}
+              phone={phone}
               onSelect={selectTenant}
             />
             <KPIs rows={filtered} />
@@ -280,37 +293,24 @@ export default function App() {
                   {filtered.length}
                 </span>
                 <span className="ml-1 max-w-44 truncate text-[10px] text-stone-400">
-                  {config.services.find((item) => item.id === service)?.name ||
-                    "Semua service"}
+                  {config.accounts.find((item) => item.id === service)?.name ||
+                    "Semua WABA Account"}
                 </span>
               </div>
-              <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-[minmax(130px,1fr)_auto_auto_auto] 2xl:w-auto">
+              <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-[minmax(130px,1fr)_auto_auto] 2xl:w-auto">
                 <label className="relative col-span-2 sm:col-span-1">
                   <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-stone-400">
                     <Icon name="search" />
                   </span>
                   <input
                     type="search"
-                    aria-label="Cari nomor atau service"
+                    aria-label="Cari nomor, nama, atau akun"
                     className={`${inputClass} pl-9`}
-                    placeholder="Cari nomor atau service…"
+                    placeholder="Cari nomor, nama, atau akun…"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                   />
                 </label>
-                <select
-                  aria-label="Filter service"
-                  className={inputClass}
-                  value={service}
-                  onChange={(event) => setService(event.target.value)}
-                >
-                  <option value="">Semua service</option>
-                  {scopedServices.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {serviceLabel(config, item)}
-                    </option>
-                  ))}
-                </select>
                 <select
                   aria-label="Filter status"
                   className={inputClass}
@@ -373,7 +373,7 @@ export default function App() {
               </h3>
               <p className="my-2 text-xs text-stone-500">
                 {!scopedServices.length
-                  ? `${tenantPath(config.tenants, tenant) || "Workspace ini"} belum memiliki nomor. Tambahkan service dan nomor untuk mulai memantau.`
+                  ? `${tenantPath(config.businessUnits, tenant) || "Workspace ini"} belum memiliki nomor. Tambahkan WABA Account dan nomor untuk mulai memantau.`
                   : "Coba nomor lain atau ubah filter."}
               </p>
               <button
@@ -385,7 +385,7 @@ export default function App() {
                 }
               >
                 {!scopedServices.length
-                  ? "Tambah nomor ke tenant"
+                  ? "Tambah WABA Account"
                   : "Reset filter"}
               </button>
             </div>

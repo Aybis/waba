@@ -1,3 +1,4 @@
+import { placeBubble } from "./bubble-layout.js";
 import { WorkstationState } from "./state.js";
 /* A shared, interactive isometric office. All scenery is drawn locally on Canvas. */
 export function createOfficeScene() {
@@ -50,7 +51,9 @@ export function createOfficeScene() {
   function buildLayout(rows) {
     const groups = new Map();
     rows.forEach((row) => {
-      const name = String(row.serviceLabel || row.service || "WABA");
+      const name = String(
+        row.serviceId || row.serviceLabel || row.service || "WABA",
+      );
       if (!groups.has(name)) groups.set(name, []);
       groups.get(name).push(row);
     });
@@ -71,7 +74,7 @@ export function createOfficeScene() {
           x = 0.35 + col * 8.0,
           y = nextY;
         zones.push({
-          service,
+          service: members[0].serviceLabel || members[0].service,
           members,
           x,
           y,
@@ -670,13 +673,24 @@ export function createOfficeScene() {
     objects.sort((a, b) => a.depth - b.depth).forEach((item) => item.paint());
     // Station nameplates are screen-facing for legibility, independent of the projection.
     view.hitAreas.forEach((area) => {
+      area.nameplate = null;
       if (tile < 16 && view.hover !== area.id) return;
       const { station, row } = area,
         q = p(station.x + 1.17, station.y + 2.03, 0.07),
-        label = String(row.number);
+        label =
+          String(row.number) +
+          (row.displayName
+            ? ` (${row.displayName.length > 18 ? row.displayName.slice(0, 17) + "…" : row.displayName})`
+            : "");
       const fontSize = Math.max(8, Math.min(10, tile * 0.39));
       ctx.font = `600 ${fontSize}px ui-monospace, SFMono-Regular, monospace`;
       const labelWidth = ctx.measureText(label).width + 24;
+      area.nameplate = {
+        x: q.x - labelWidth / 2,
+        y: q.y - 5,
+        w: labelWidth,
+        h: 16,
+      };
       rounded(
         ctx,
         q.x - labelWidth / 2,
@@ -759,34 +773,39 @@ export function createOfficeScene() {
             : state === "working"
               ? "Memproses pesan…"
               : "Sedang istirahat";
-      const detail = hovered
-        ? String(row.number)
-        : state === "error"
-          ? "Periksa workstation"
-          : state === "working"
-            ? `${row.queueDepth || 0} dalam antrean`
-            : "";
+      const detail = `${row.number} · ${row.displayName || row.serviceLabel}`;
       ctx.font = "600 10px system-ui";
       const bw = Math.min(
           164,
           Math.max(115, ctx.measureText(label).width + 27),
         ),
         bh = detail ? 43 : 30;
-      const anchor = area.head,
-        x = Math.max(8, Math.min(view.width - bw - 8, anchor.x - bw / 2)),
-        y = anchor.y - bh - 15;
-      if (y < 10) continue;
-      if (
-        !hovered &&
-        taken.some(
-          (r) =>
-            x < r.x + r.w + 10 &&
-            x + bw > r.x - 10 &&
-            y < r.y + r.h + 12 &&
-            y + bh > r.y - 12,
-        )
-      )
-        continue;
+      const anchor = area.head;
+      const obstacles = [
+        ...taken,
+        ...view.hitAreas.flatMap((other) => {
+          const o = other.operator;
+          return [
+            {
+              x: o.x - o.w - 5,
+              y: Math.min(o.y - o.h, other.head.y) - 12,
+              w: o.w * 2 + 10,
+              h: Math.max(o.h, o.y - other.head.y) + 24,
+            },
+            ...(other.nameplate ? [other.nameplate] : []),
+          ];
+        }),
+      ];
+      const position = placeBubble(
+        anchor,
+        bw,
+        bh,
+        view.width,
+        view.height,
+        obstacles,
+      );
+      if (!position) continue;
+      const { x, y } = position;
       ctx.save();
       ctx.shadowColor = "#52654815";
       ctx.shadowBlur = 8;
@@ -803,12 +822,6 @@ export function createOfficeScene() {
       );
       ctx.restore();
       ctx.beginPath();
-      ctx.moveTo(anchor.x - 4, y + bh - 1);
-      ctx.lineTo(anchor.x, y + bh + 5);
-      ctx.lineTo(anchor.x + 4, y + bh - 1);
-      ctx.fillStyle = state === "error" ? "#fff7f2" : "#fffefa";
-      ctx.fill();
-      ctx.beginPath();
       ctx.arc(x + 11, y + 14, 2.5, 0, Math.PI * 2);
       ctx.fillStyle = colors[state];
       ctx.fill();
@@ -819,7 +832,17 @@ export function createOfficeScene() {
       if (detail) {
         ctx.font = "9px system-ui";
         ctx.fillStyle = "#929b8a";
-        ctx.fillText(detail, x + 19, y + 31);
+        let shortDetail = detail;
+        while (
+          ctx.measureText(shortDetail).width > bw - 29 &&
+          shortDetail.length > 1
+        )
+          shortDetail = shortDetail.slice(0, -1);
+        ctx.fillText(
+          shortDetail === detail ? detail : shortDetail.slice(0, -1) + "…",
+          x + 19,
+          y + 31,
+        );
       }
       taken.push({ x, y, w: bw, h: bh });
     }
@@ -861,7 +884,7 @@ export function createOfficeScene() {
         view.buttons.set(id, button);
       }
       button._officeRow = row;
-      button.textContent = `${row.serviceLabel || row.service} · ${row.number} · ${WorkstationState ? WorkstationState.label(stateOf(row)) : stateOf(row)}. Buka detail workstation.`;
+      button.textContent = `${row.serviceLabel || row.service} · ${row.number} ${row.displayName || ""} · ${WorkstationState ? WorkstationState.label(stateOf(row)) : stateOf(row)}. Buka detail workstation.`;
       const atIndex = view.navigation.children[index];
       if (atIndex !== button)
         view.navigation.insertBefore(button, atIndex || null);

@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { eventsFor, fmt, spansFor } from "../lib/telemetry.js";
-import { DEFAULT_CONFIG, tenantPath, validConfig } from "../lib/config.js";
+import { DEFAULT_CONFIG, validConfig } from "../lib/config.js";
 import { WorkstationState } from "../lib/state.js";
 import { buttonClass, Icon, inputClass } from "./ui.jsx";
 
@@ -71,8 +71,9 @@ export function SessionDialog({ row, tick, onClose }) {
   const duration = spans.at(-1).start + spans.at(-1).dur - spans[0].start;
   const stats = [
     ["Nomor WABA", row.number],
-    ["Tenant", row.tenantPath],
-    ["Service", row.service],
+    ["Business Unit", row.tenantPath],
+    ["WABA Account", row.serviceLabel],
+    ["Display name", row.displayName || "—"],
     ["Status", WorkstationState.label(WorkstationState.resolve(row))],
     ["Pesan", fmt(row.total)],
     ["Error", fmt(row.errors)],
@@ -152,272 +153,268 @@ export function SessionDialog({ row, tick, onClose }) {
 }
 
 export function SettingsDialog({ config, initialTenant, onSave, onClose }) {
-  const [tenants, setTenants] = useState(() => structuredClone(config.tenants));
-  const [draft, setDraft] = useState(() =>
-    config.services.map((service) => ({
-      ...service,
-      numbers: service.numbers.join(", "),
-    })),
-  );
-  const [tab, setTab] = useState("numbers");
+  const [draft, setDraft] = useState(() => structuredClone(config));
   const [error, setError] = useState("");
-  const roots = tenants.filter((tenant) => !tenant.parentId);
-  function update(index, key, value) {
-    setDraft((previous) =>
-      previous.map((service, i) =>
-        i === index ? { ...service, [key]: value } : service,
+  const [tab, setTab] = useState("accounts");
+  const change = (id, key, value) =>
+    setDraft((d) => ({
+      ...d,
+      accounts: d.accounts.map((a) =>
+        a.id === id ? { ...a, [key]: value } : a,
       ),
-    );
-  }
-  function updateTenant(id, key, value) {
-    setTenants((previous) =>
-      previous.map((tenant) =>
-        tenant.id === id ? { ...tenant, [key]: value } : tenant,
-      ),
-    );
-  }
-  function submit(event) {
-    event.preventDefault();
+    }));
+  function submit(e) {
+    e.preventDefault();
     const next = {
-      tenants: tenants.map((tenant) => ({
-        ...tenant,
-        name: tenant.name.trim(),
+      businessUnits: draft.businessUnits.map((u) => ({
+        ...u,
+        name: u.name.trim(),
       })),
-      services: draft.map((service) => ({
-        ...service,
-        name: service.name.trim(),
-        numbers: [
-          ...new Set(
-            service.numbers
-              .split(",")
-              .map((number) => number.trim())
-              .filter(Boolean),
-          ),
-        ],
+      accounts: draft.accounts.map((a) => ({
+        ...a,
+        name: a.name.trim(),
+        wabaId: a.wabaId.trim(),
+        numbers: a.numbers.map((n) => ({
+          ...n,
+          number: n.number.trim(),
+          displayName: n.displayName.trim(),
+        })),
       })),
     };
     if (!validConfig(next)) {
       setError(
-        "Isi nama tenant, pilih induk yang valid, dan isi nama service serta nomor WABA. Nama harus unik dalam tenant atau induk yang sama.",
+        "Isi nama Business Unit, nama akun, dan nomor. Nomor dalam satu akun harus unik.",
       );
       return;
     }
     try {
       onSave(next);
     } catch {
-      setError(
-        "Konfigurasi belum tersimpan. Penyimpanan browser tidak tersedia.",
-      );
+      setError("Perubahan belum tersimpan. Periksa penyimpanan browser.");
     }
   }
-  function reset() {
-    setTenants(structuredClone(DEFAULT_CONFIG.tenants));
-    setDraft(
-      DEFAULT_CONFIG.services.map((service) => ({
-        ...service,
-        numbers: service.numbers.join(", "),
-      })),
-    );
-    setError("");
-  }
   return (
-    <Dialog title="Tenant & Nomor" onClose={onClose}>
-      <div className="mb-4 flex gap-2">
-        <button
-          className={`${buttonClass} flex-1 ${tab === "numbers" ? "bg-emerald-50 text-emerald-800" : ""}`}
-          aria-pressed={tab === "numbers"}
-          onClick={() => setTab("numbers")}
-        >
-          Nomor & service
-        </button>
-        <button
-          className={`${buttonClass} flex-1 ${tab === "tenants" ? "bg-emerald-50 text-emerald-800" : ""}`}
-          aria-pressed={tab === "tenants"}
-          onClick={() => setTab("tenants")}
-        >
-          Tenant & subtenant
-        </button>
-      </div>
-      <p className="mb-4 text-xs leading-relaxed text-stone-500">
-        {tab === "numbers"
-          ? "Pilih tenant pemilik service. Setiap nomor mendapat satu meja; pisahkan nomor dengan koma."
-          : "Susun tenant utama dan subtenant. Tenant tanpa nomor tetap tersedia, tanpa data simulasi tambahan."}
+    <Dialog title="Business Unit & WABA" onClose={onClose} wide>
+      <p className="mb-4 text-xs text-stone-500">
+        Business Unit → WABA Account → WA number (display name). Setiap akun
+        menjadi satu blok kantor.
       </p>
+      <div className="mb-4 flex gap-2">
+        {[
+          ["accounts", "WABA Accounts & numbers"],
+          ["units", "Business Units"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            className={buttonClass}
+            aria-pressed={tab === key}
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <form onSubmit={submit}>
-        {tab === "tenants" ? (
+        {tab === "units" ? (
           <div className="space-y-3">
-            {tenants.map((tenant) => {
-              const used = draft.some(
-                (service) => service.tenantId === tenant.id,
-              );
-              const hasChildren = tenants.some(
-                (child) => child.parentId === tenant.id,
-              );
-              return (
-                <fieldset
-                  key={tenant.id}
-                  className="rounded-xl border border-stone-200 bg-stone-50 p-3"
-                >
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <label className="min-w-0 text-xs text-stone-500">
-                      Nama tenant
-                      <input
-                        aria-label={`Nama tenant ${tenant.name || "baru"}`}
-                        className={`${inputClass} mt-1`}
-                        value={tenant.name}
-                        onChange={(event) =>
-                          updateTenant(tenant.id, "name", event.target.value)
-                        }
-                      />
-                    </label>
-                    <label className="min-w-0 text-xs text-stone-500">
-                      Induk
-                      <select
-                        aria-label={`Induk ${tenant.name || "baru"}`}
-                        disabled={hasChildren}
-                        className={`${inputClass} mt-1 disabled:bg-stone-100`}
-                        value={tenant.parentId || ""}
-                        onChange={(event) =>
-                          updateTenant(
-                            tenant.id,
-                            "parentId",
-                            event.target.value || null,
-                          )
-                        }
-                      >
-                        <option value="">Tenant utama</option>
-                        {roots
-                          .filter((root) => root.id !== tenant.id)
-                          .map((root) => (
-                            <option key={root.id} value={root.id}>
-                              {root.name}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between gap-3">
-                    <p className="text-[10px] text-stone-400">
-                      {hasChildren
-                        ? "Memiliki subtenant"
-                        : used
-                          ? "Memiliki service"
-                          : "Belum memiliki service"}
-                    </p>
-                    <button
-                      type="button"
-                      disabled={used || hasChildren || tenants.length === 1}
-                      className="min-h-10 text-xs text-rose-600 disabled:cursor-not-allowed disabled:text-stone-300"
-                      onClick={() =>
-                        setTenants((previous) =>
-                          previous.filter((item) => item.id !== tenant.id),
-                        )
-                      }
-                    >
-                      Hapus {tenant.name || "tenant"}
-                    </button>
-                  </div>
-                </fieldset>
-              );
-            })}
-            <button
-              type="button"
-              className={buttonClass}
-              onClick={() =>
-                setTenants((previous) => [
-                  ...previous,
-                  { id: crypto.randomUUID(), name: "", parentId: null },
-                ])
-              }
-            >
-              + Tambah tenant
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {draft.map((service, index) => (
-              <fieldset
-                key={service.id}
-                className="space-y-2 rounded-xl border border-stone-200 bg-stone-50 p-3"
-              >
-                <legend className="px-1 text-xs text-stone-500">
-                  Service {index + 1}
-                </legend>
-                <label className="block text-xs text-stone-500">
-                  Tenant / subtenant
-                  <select
-                    aria-label={`Tenant service ${index + 1}`}
-                    value={service.tenantId}
-                    onChange={(event) =>
-                      update(index, "tenantId", event.target.value)
-                    }
-                    className={`${inputClass} mt-1`}
-                  >
-                    {tenants.map((tenant) => (
-                      <option key={tenant.id} value={tenant.id}>
-                        {tenantPath(tenants, tenant.id) || "Tenant baru"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block text-xs text-stone-500">
-                  Nama service
+            {draft.businessUnits.map((u) => (
+              <div key={u.id} className="flex gap-2">
+                <label className="min-w-0 flex-1 text-xs">
+                  Business Unit
                   <input
-                    aria-label={`Nama service ${index + 1}`}
-                    value={service.name}
-                    onChange={(event) =>
-                      update(index, "name", event.target.value)
-                    }
+                    required
                     className={`${inputClass} mt-1`}
-                  />
-                </label>
-                <label className="block text-xs text-stone-500">
-                  Nomor WABA
-                  <input
-                    aria-label={`Nomor WABA ${index + 1}`}
-                    value={service.numbers}
-                    onChange={(event) =>
-                      update(index, "numbers", event.target.value)
+                    value={u.name}
+                    onChange={(e) =>
+                      setDraft((d) => ({
+                        ...d,
+                        businessUnits: d.businessUnits.map((v) =>
+                          v.id === u.id ? { ...v, name: e.target.value } : v,
+                        ),
+                      }))
                     }
-                    className={`${inputClass} mt-1`}
                   />
                 </label>
                 <button
                   type="button"
-                  className="min-h-10 text-xs text-rose-600 underline underline-offset-4"
+                  className={`${buttonClass} disabled:opacity-30`}
+                  disabled={
+                    draft.businessUnits.length === 1 ||
+                    draft.accounts.some((a) => a.businessUnitId === u.id)
+                  }
                   onClick={() =>
-                    setDraft((previous) =>
-                      previous.filter((_, i) => i !== index),
-                    )
+                    setDraft((d) => ({
+                      ...d,
+                      businessUnits: d.businessUnits.filter(
+                        (v) => v.id !== u.id,
+                      ),
+                    }))
                   }
                 >
-                  Hapus service {index + 1}
+                  Hapus
                 </button>
-              </fieldset>
+              </div>
             ))}
-            {!draft.length && (
-              <p className="rounded-lg bg-stone-50 p-4 text-xs text-stone-500">
-                Belum ada service. Tenant tetap tersimpan.
-              </p>
-            )}
             <button
               type="button"
               className={buttonClass}
               onClick={() =>
-                setDraft((previous) => [
-                  ...previous,
-                  {
-                    id: crypto.randomUUID(),
-                    tenantId: tenants.some((item) => item.id === initialTenant)
-                      ? initialTenant
-                      : tenants[0].id,
-                    name: "",
-                    numbers: "",
-                  },
-                ])
+                setDraft((d) => ({
+                  ...d,
+                  businessUnits: [
+                    ...d.businessUnits,
+                    { id: crypto.randomUUID(), name: "" },
+                  ],
+                }))
               }
             >
-              + Tambah service
+              + Business Unit
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {draft.accounts.map((a, i) => (
+              <fieldset
+                key={a.id}
+                className="space-y-3 rounded-xl border border-stone-200 p-3"
+              >
+                <legend className="px-1 text-xs">WABA Account {i + 1}</legend>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <label className="min-w-0 text-xs">
+                    Business Unit
+                    <select
+                      className={`${inputClass} mt-1`}
+                      value={a.businessUnitId}
+                      onChange={(e) =>
+                        change(a.id, "businessUnitId", e.target.value)
+                      }
+                    >
+                      {draft.businessUnits.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name || "Unit baru"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="min-w-0 text-xs">
+                    WABA Account name
+                    <input
+                      required
+                      className={`${inputClass} mt-1`}
+                      value={a.name}
+                      onChange={(e) => change(a.id, "name", e.target.value)}
+                    />
+                  </label>
+                  <label className="min-w-0 text-xs">
+                    WABA Account ID
+                    <input
+                      className={`${inputClass} mt-1`}
+                      placeholder="11234"
+                      value={a.wabaId}
+                      onChange={(e) => change(a.id, "wabaId", e.target.value)}
+                    />
+                  </label>
+                </div>
+                {a.numbers.map((n) => (
+                  <div
+                    key={n.id}
+                    className="grid grid-cols-[1fr_auto] items-end gap-2 rounded-lg bg-stone-50 p-2 sm:grid-cols-[1fr_1fr_auto]"
+                  >
+                    {[
+                      ["number", "WA number"],
+                      ["displayName", "Display name"],
+                    ].map(([key, label]) => (
+                      <label
+                        key={key}
+                        className="col-start-1 min-w-0 text-xs sm:col-start-auto"
+                      >
+                        {label}
+                        <input
+                          required={key === "number"}
+                          className={`${inputClass} mt-1`}
+                          value={n[key]}
+                          onChange={(e) =>
+                            change(
+                              a.id,
+                              "numbers",
+                              a.numbers.map((p) =>
+                                p.id === n.id
+                                  ? { ...p, [key]: e.target.value }
+                                  : p,
+                              ),
+                            )
+                          }
+                        />
+                      </label>
+                    ))}
+                    <button
+                      type="button"
+                      aria-label={`Hapus nomor ${n.number}`}
+                      className={`${buttonClass} col-start-2 sm:col-start-auto`}
+                      onClick={() =>
+                        change(
+                          a.id,
+                          "numbers",
+                          a.numbers.filter((p) => p.id !== n.id),
+                        )
+                      }
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className={buttonClass}
+                    onClick={() =>
+                      change(a.id, "numbers", [
+                        ...a.numbers,
+                        {
+                          id: crypto.randomUUID(),
+                          number: "",
+                          displayName: "",
+                        },
+                      ])
+                    }
+                  >
+                    + WA number
+                  </button>
+                  <button
+                    type="button"
+                    className={`${buttonClass} text-rose-600`}
+                    onClick={() =>
+                      setDraft((d) => ({
+                        ...d,
+                        accounts: d.accounts.filter((v) => v.id !== a.id),
+                      }))
+                    }
+                  >
+                    Hapus akun {a.name}
+                  </button>
+                </div>
+              </fieldset>
+            ))}
+            <button
+              type="button"
+              className={buttonClass}
+              onClick={() =>
+                setDraft((d) => ({
+                  ...d,
+                  accounts: [
+                    ...d.accounts,
+                    {
+                      id: crypto.randomUUID(),
+                      name: "",
+                      wabaId: "",
+                      businessUnitId: initialTenant || d.businessUnits[0].id,
+                      numbers: [],
+                    },
+                  ],
+                }))
+              }
+            >
+              + WABA Account
             </button>
           </div>
         )}
@@ -429,12 +426,19 @@ export function SettingsDialog({ config, initialTenant, onSave, onClose }) {
         <footer className="mt-5 flex flex-wrap gap-2">
           <button
             type="submit"
-            className={`${buttonClass} border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800`}
+            className={`${buttonClass} bg-emerald-700 text-white`}
           >
             Simpan perubahan
           </button>
-          <button type="button" className={buttonClass} onClick={reset}>
-            Reset default
+          <button
+            type="button"
+            className={buttonClass}
+            onClick={() => {
+              setDraft(structuredClone(DEFAULT_CONFIG));
+              setError("");
+            }}
+          >
+            Gunakan contoh TSO
           </button>
           <button type="button" className={buttonClass} onClick={onClose}>
             Batal

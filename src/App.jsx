@@ -1,3 +1,5 @@
+import { BusinessBoard } from "./components/BusinessBoard.jsx";
+import { UsageDashboard } from "./components/UsageDashboard.jsx";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Office } from "./components/Office.jsx";
 import { SessionDialog, SettingsDialog } from "./components/Dialogs.jsx";
@@ -10,7 +12,7 @@ import {
 import { buttonClass, dotClasses, Icon, inputClass } from "./components/ui.jsx";
 import { fetchTelemetry, fmt } from "./lib/telemetry.js";
 import {
-  loadConfig,
+  loadDemoWorkspace,
   saveConfig,
   tenantScopeIds,
   tenantPath,
@@ -20,7 +22,9 @@ import { TenantTree, TenantFilters } from "./components/Tenants.jsx";
 import { WorkstationState } from "./lib/state.js";
 
 const views = [
-  { id: "office", name: "The office", icon: "office" },
+  { id: "office", name: "BU Monitor", icon: "office" },
+  { id: "usage", name: "Usage & Cost", icon: "flow" },
+  { id: "scene", name: "Office view", icon: "grid" },
   { id: "workstations", name: "Workstations", icon: "grid" },
   { id: "agents", name: "Agent View", icon: "chat" },
   { id: "flow", name: "Traffic Flow", icon: "flow" },
@@ -33,10 +37,10 @@ const time = (date) =>
   });
 
 export default function App() {
-  const [config, setConfig] = useState(loadConfig);
+  const [config, setConfig] = useState(loadDemoWorkspace);
   const [tick, setTick] = useState(1);
   const [updated, setUpdated] = useState(() => new Date());
-  const [view, setView] = useState("office");
+  const [view, setView] = useState("scene");
   const [tenant, setTenant] = useState("");
   const [phone, setPhone] = useState("");
   const [service, setService] = useState("");
@@ -108,6 +112,7 @@ export default function App() {
   }, [focused, selected, settings]);
 
   function persist(next) {
+    next = { ...next, demoCoverageVersion: 2 };
     saveConfig(next);
     setConfig(next);
     setService("");
@@ -167,7 +172,7 @@ export default function App() {
         </p>
         <nav
           aria-label="Tampilan dashboard"
-          className="mt-5 grid grid-cols-4 gap-1 md:mt-0 md:grid-cols-1 md:gap-1.5"
+          className="mt-5 grid grid-cols-3 gap-1 md:mt-0 md:grid-cols-1 md:gap-1.5"
         >
           {views.map((item) => (
             <button
@@ -258,7 +263,7 @@ export default function App() {
               </span>
               <div className="flex gap-2">
                 <button
-                  className={`${buttonClass} ${live ? "border-[#3d7155] bg-[#3d7155] text-white hover:bg-emerald-800" : ""}`}
+                  className={`${buttonClass} ${live ? "border-[#3d7155]! bg-[#3d7155]! text-white! hover:bg-emerald-800!" : ""}`}
                   aria-pressed={live}
                   onClick={() => setLive(!live)}
                 >
@@ -279,8 +284,9 @@ export default function App() {
               phone={phone}
               onSelect={selectTenant}
             />
-            <KPIs rows={filtered} />
+            {view !== "usage" && <KPIs rows={filtered} />}
             <section
+              hidden={view === "usage"}
               aria-label="Filter workstation"
               className="mb-3 flex flex-wrap items-center justify-between gap-3"
             >
@@ -333,7 +339,10 @@ export default function App() {
                 </button>
               </div>
             </section>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div
+              hidden={view === "usage"}
+              className="mb-4 flex flex-wrap items-center justify-between gap-3"
+            >
               <p className="hidden text-[9px] tracking-wider text-stone-400 lg:block">
                 ◇ A BIRD’S-EYE VIEW <span className="mx-2">/</span> Klik
                 operator untuk detail sesi
@@ -363,7 +372,7 @@ export default function App() {
               </div>
             </div>
           </div>
-          {!filtered.length && (
+          {!filtered.length && view !== "office" && view !== "usage" && (
             <div
               inert={focused}
               className="mb-4 rounded-xl border border-dashed border-stone-300 bg-white p-7 text-center"
@@ -391,6 +400,26 @@ export default function App() {
             </div>
           )}
           {view === "office" && (
+            <BusinessBoard
+              config={config}
+              rows={filtered}
+              selectedUnit={tenant}
+              onSelect={select}
+              onSettings={(id) => {
+                selectTenant(id);
+                setSettings(true);
+              }}
+            />
+          )}
+          {view === "usage" && (
+            <UsageDashboard
+              config={config}
+              unit={tenant}
+              account={service}
+              phone={phone}
+            />
+          )}
+          {view === "scene" && (
             <Office
               rows={filtered}
               paused={paused}
@@ -415,7 +444,9 @@ export default function App() {
             <Flow rows={filtered} paused={paused} onSelect={select} />
           )}
           <div inert={focused}>
-            <MetricsTable rows={filtered} onSelect={select} />
+            {view !== "usage" && (
+              <MetricsTable rows={filtered} onSelect={select} />
+            )}
             <footer className="mt-5 flex flex-col justify-between gap-2 text-[9px] text-stone-400 sm:flex-row">
               <span>● Made for the way your team works.</span>
               <span>Demo workspace · Belum terhubung ke WABA / Meta API</span>

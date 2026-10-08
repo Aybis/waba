@@ -1,3 +1,4 @@
+import { businessTheme } from "./business-colors.js";
 import { placeBubble } from "./bubble-layout.js";
 import { WorkstationState } from "./state.js";
 /* A shared, interactive isometric office. All scenery is drawn locally on Canvas. */
@@ -5,12 +6,6 @@ export function createOfficeScene() {
   "use strict";
   const views = new WeakMap();
   const activeViews = new Set();
-  const palette = [
-    { floor: "#e4def1", edge: "#c5b6df", accent: "#947bc0", dark: "#746090" },
-    { floor: "#d9e8d9", edge: "#a9c9ad", accent: "#72a88b", dark: "#4d8068" },
-    { floor: "#f0e0cf", edge: "#dbc1a4", accent: "#c69569", dark: "#a07550" },
-    { floor: "#dbe5ef", edge: "#b9cedf", accent: "#7e9fb9", dark: "#597b98" },
-  ];
   const colors = {
     working: "#4b9a76",
     idle: "#829397",
@@ -57,7 +52,7 @@ export function createOfficeScene() {
       if (!groups.has(name)) groups.set(name, []);
       groups.get(name).push(row);
     });
-    const columns = Math.min(2, Math.max(1, groups.size));
+    const columns = Math.min(4, Math.max(1, Math.ceil(Math.sqrt(groups.size))));
     const zones = [],
       stations = [];
     let nextY = 0.35;
@@ -74,20 +69,20 @@ export function createOfficeScene() {
           x = 0.35 + col * 8.0,
           y = nextY;
         zones.push({
-          service: members[0].serviceLabel || members[0].service,
+          service: `${members[0].tenantPath || ""} · ${members[0].service}`,
           members,
           x,
           y,
           w: 7.5,
           d: height - 0.35,
-          theme: palette[index % palette.length],
+          theme: businessTheme(members[0].tenantId, members[0].tenantPath),
         });
         members.forEach((row, i) =>
           stations.push({
             row,
             x: x + 0.8 + (i % 2) * 3.3,
             y: y + 1.0 + Math.floor(i / 2) * 2.5,
-            theme: palette[index % palette.length],
+            theme: businessTheme(members[0].tenantId, members[0].tenantPath),
             seed: hash(row.id || `${service}-${row.number}`),
             state: stateOf(row),
           }),
@@ -399,6 +394,8 @@ export function createOfficeScene() {
       const id = String(row.id || `${row.service}-${row.number}`),
         hovered = view.hover === id;
       const phase = view.time * 2.8 + (seed % 20);
+      if (state === "error")
+        flat(x - 0.25, y - 0.2, 2.8, 2.5, 0.026, "#fecaca", "#dc2626");
       if (hovered)
         flat(x - 0.17, y - 0.13, 2.65, 2.18, 0.027, "#ffffff70", theme.accent);
       add(x + y + 1.4, () => {
@@ -674,12 +671,13 @@ export function createOfficeScene() {
     // Station nameplates are screen-facing for legibility, independent of the projection.
     view.hitAreas.forEach((area) => {
       area.nameplate = null;
-      if (tile < 16 && view.hover !== area.id) return;
+      if (tile < 9 && view.hover !== area.id && area.station.state !== "error")
+        return;
       const { station, row } = area,
         q = p(station.x + 1.17, station.y + 2.03, 0.07),
         label =
           String(row.number) +
-          (row.displayName
+          (row.displayName && view.hover === area.id
             ? ` (${row.displayName.length > 18 ? row.displayName.slice(0, 17) + "…" : row.displayName})`
             : "");
       const fontSize = Math.max(8, Math.min(10, tile * 0.39));
@@ -698,14 +696,23 @@ export function createOfficeScene() {
         labelWidth,
         16,
         5,
-        view.hover === area.id ? "#ffffff" : "#fffffff0",
-        view.hover === area.id ? station.theme.accent : "#d7ded3",
+        station.state === "error"
+          ? "#dc2626"
+          : view.hover === area.id
+            ? "#ffffff"
+            : "#fffffff0",
+        station.state === "error"
+          ? "#991b1b"
+          : view.hover === area.id
+            ? station.theme.accent
+            : "#d7ded3",
       );
       ctx.beginPath();
       ctx.arc(q.x - labelWidth / 2 + 7, q.y + 3, 2, 0, Math.PI * 2);
-      ctx.fillStyle = colors[station.state];
+      ctx.fillStyle =
+        station.state === "error" ? "#ffffff" : colors[station.state];
       ctx.fill();
-      ctx.fillStyle = "#506153";
+      ctx.fillStyle = station.state === "error" ? "#ffffff" : "#506153";
       ctx.textAlign = "left";
       ctx.fillText(label, q.x - labelWidth / 2 + 14, q.y + 6);
     });

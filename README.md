@@ -81,3 +81,13 @@ src/
 ```
 
 UI menggunakan utility Tailwind dan plugin resmi `@tailwindcss/vite`. Warna/geometri canvas digambar melalui API Canvas, bukan stylesheet. Style numerik inline hanya digunakan untuk panjang/posisi bar waterfall berbasis data.
+
+## BU Monitor & Usage / Cost
+
+- **BU Monitor** shows every configured BU as a rectangle, with nested WABA accounts and selectable WA numbers. Unconfigured BUs remain visible. Error numbers and their BU borders are red.
+- **Office view** retains the isometric layout; error desk floors and number labels are red.
+- **Usage & Cost** provides monthly simulated usage, IDR category prices, category/BU/number breakdowns, daily trends, CSV export, persisted rate overrides, one-word reply counts and conversation burst review.
+- Rates were retrieved from Meta's Indonesia/IDR calculator on 7 October 2026. Marketing Lite uses a clearly labelled list-rate reference; actual delivery pricing can differ. Usage and billability are simulated, not ORION records or a real invoice.
+- See [operations and billing rules](docs/operations-and-billing.md) for price evidence, limitations, definitions, and the ORION integration contract.
+
+The default **Office view** now fills empty BUs with 2–3 masked demo numbers per BU (one-time, existing numbers preserved). Selecting all BUs shows every account in the isometric office and includes those sample numbers in usage analytics. Demo accounts are editable through settings.

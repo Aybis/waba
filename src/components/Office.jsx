@@ -1,3 +1,4 @@
+import { businessTheme } from "../lib/business-colors.js";
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import { createOfficeScene } from "../lib/office-scene.js";
 import { StatusBubble, WorkstationState } from "../lib/state.js";
@@ -38,6 +39,14 @@ export function Scene({ rows, paused, bubbles, onSelect, ref }) {
 
 export function Office({ rows, paused, bubbles, onSelect, focused, onFocus }) {
   const scene = useRef(null);
+  const units = [
+    ...new Map(
+      rows.map((row) => [
+        row.tenantId,
+        { id: row.tenantId, name: row.tenantPath },
+      ]),
+    ).values(),
+  ];
   return (
     <section
       aria-label="Kantor monitoring isometrik"
@@ -56,7 +65,7 @@ export function Office({ rows, paused, bubbles, onSelect, focused, onFocus }) {
               FLOOR 01
             </span>
             <h2 className="text-[11px] font-medium text-[#647654] sm:text-xs">
-              The WABA headquarters
+              All Business Units · WABA office
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -75,6 +84,34 @@ export function Office({ rows, paused, bubbles, onSelect, focused, onFocus }) {
               <Icon name="focus" />
             </button>
           </div>
+        </div>
+        <div className="max-h-28 shrink-0 overflow-y-auto border-y border-[#dce3d4] bg-[#f8faf3] px-3 py-2 sm:px-5">
+          <div className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] text-stone-500">
+            <strong className="tracking-widest">BUSINESS UNIT</strong>
+            <span>
+              Warna lantai = BU ·{" "}
+              <strong className="text-red-700">Nomor merah = error</strong>
+            </span>
+          </div>
+          <ul
+            aria-label="Business Unit color legend"
+            className="flex flex-wrap gap-x-4 gap-y-2"
+          >
+            {units.map((unit) => (
+              <li
+                key={unit.id}
+                className="flex items-center gap-1.5 text-[10px] font-medium"
+              >
+                <span
+                  className="size-2.5 shrink-0 rounded-sm"
+                  style={{
+                    backgroundColor: businessTheme(unit.id, unit.name).accent,
+                  }}
+                />
+                <span>{unit.name}</span>
+              </li>
+            ))}
+          </ul>
         </div>
         <div className="min-h-0 flex-1">
           <Scene

@@ -124,3 +124,58 @@ export function saveConfig(config, storage = globalThis.localStorage) {
     throw new Error("Konfigurasi Business Unit / WABA tidak valid.");
   storage.setItem(STORAGE_KEY, JSON.stringify(config));
 }
+
+// One-time demo expansion requested by the user. Never replaces existing numbers.
+export function withDemoNumbers(config) {
+  const next = structuredClone(config);
+  next.businessUnits.forEach((unit, index) => {
+    if (
+      next.accounts.some(
+        (account) =>
+          account.businessUnitId === unit.id && account.numbers.length,
+      )
+    )
+      return;
+    let id = `demo-${unit.id}`;
+    while (next.accounts.some((account) => account.id === id)) id += "-sample";
+    next.accounts.push({
+      id,
+      businessUnitId: unit.id,
+      name: `${unit.name} Demo`,
+      wabaId: `DEMO-${String(index + 1).padStart(3, "0")}`,
+      numbers: Array.from({ length: 2 + (index % 2) }, (_, i) => ({
+        id: `${id}-number-${i + 1}`,
+        number: `08${String(index + 1).padStart(2, "0")}xx${i + 1}`,
+        displayName: `${unit.name} Agent ${i + 1}`,
+      })),
+    });
+  });
+  // Replace only the original four-digit simulation placeholders, which were
+  // duplicated between TSO and DSO. Preserve user-entered real phone numbers.
+  next.accounts.forEach((account) => {
+    const unitIndex = next.businessUnits.findIndex(
+      (unit) => unit.id === account.businessUnitId,
+    );
+    account.numbers = account.numbers.map((phone, index) =>
+      /^08(15|16|17|18|19|20)$/.test(phone.number)
+        ? {
+            ...phone,
+            number: `08${String(unitIndex + 1).padStart(2, "0")}xx${index + 1}`,
+          }
+        : phone,
+    );
+  });
+  next.demoCoverageVersion = 2;
+  return next;
+}
+export function loadDemoWorkspace(storage = globalThis.localStorage) {
+  const config = loadConfig(storage);
+  if (config.demoCoverageVersion === 2) return config;
+  const expanded = withDemoNumbers(config);
+  try {
+    saveConfig(expanded, storage);
+  } catch {
+    /* Demo remains usable without storage. */
+  }
+  return expanded;
+}

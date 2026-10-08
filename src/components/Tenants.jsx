@@ -125,7 +125,7 @@ export function TenantFilters({ config, selected, account, phone, onSelect }) {
       className="mb-5 rounded-xl border border-stone-200 bg-[#fdfefb] p-3 sm:p-4"
     >
       <p className="mb-3 text-[10px] text-stone-500">
-        Satu blok = WABA Account · Satu orang = WA number
+        Business Unit → WABA Account → WA number
       </p>
       <div className="grid gap-2 sm:grid-cols-3">
         <label className="min-w-0 text-xs">

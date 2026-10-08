@@ -96,3 +96,26 @@ test("v4 roundtrip leaves previous storage unchanged and blocked storage uses fr
   c.businessUnits[0].name = "changed";
   assert.equal(DEFAULT_CONFIG.businessUnits[0].name, "ISO");
 });
+
+test("demo expansion supplies 2–3 numbers to every empty BU without replacing saved numbers", async () => {
+  const { withDemoNumbers, loadDemoWorkspace } = await import("./config.js");
+  const original = fresh(),
+    expanded = withDemoNumbers(original);
+  assert.ok(validConfig(expanded));
+  assert.deepEqual(expanded.accounts[0], original.accounts[0]);
+  for (const unit of expanded.businessUnits) {
+    const count = expanded.accounts
+      .filter((a) => a.businessUnitId === unit.id)
+      .reduce((s, a) => s + a.numbers.length, 0);
+    assert.ok(count >= 2 && count <= 3);
+  }
+  assert.deepEqual(withDemoNumbers(expanded), expanded);
+  const values = {};
+  const storage = {
+    getItem: (k) => values[k] || null,
+    setItem: (k, v) => (values[k] = v),
+  };
+  const loaded = loadDemoWorkspace(storage);
+  assert.equal(loaded.accounts.length, 11);
+  assert.deepEqual(loadDemoWorkspace(storage), loaded);
+});
